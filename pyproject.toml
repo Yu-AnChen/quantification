@@ -1,0 +1,28 @@
+[build-system]
+requires = ["setuptools>=64", "setuptools-scm"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "mcquant"
+version = "0.1.0"
+requires-python = ">=3.10"
+dependencies = [
+    "h5py>=3.11",
+    "pandas>=2.2",
+    "numpy>=2.0",
+    "scikit-image>=0.24",
+    "tifffile>=2024.9",
+    "zarr>=2.18,<3",
+    "joblib>=1.4",
+    "tqdm>=4.66",
+    "imagecodecs>=2024.9",
+]
+
+[project.scripts]
+mcquant = "mcquant.cli:main"
+
+[tool.setuptools]
+packages = ["mcquant"]
+
+[tool.setuptools.package-dir]
+"" = "."
