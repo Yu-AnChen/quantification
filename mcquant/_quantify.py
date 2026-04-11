@@ -289,7 +289,6 @@ def _reorder_columns(df: pd.DataFrame) -> pd.DataFrame:
 
 def build_output(
     morph_df: pd.DataFrame,
-    valid_labels: np.ndarray,
     channel_arrays: dict[str, np.ndarray],
 ) -> pd.DataFrame:
     """

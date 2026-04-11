@@ -147,8 +147,10 @@ class Pipeline:
             log.info("Cells found: %d  (max label: %d)", len(valid_labels), max_label)
 
             # Intensity passes — one per channel
+            n_channels = len(self._channel_names)
             channel_arrays: dict[str, np.ndarray] = {}
             for ch_idx, ch_name in enumerate(self._channel_names):
+                log.info("Channel %d/%d: %s", ch_idx + 1, n_channels, ch_name)
                 ch_arrays = intensity_pass(
                     mask_zarr_dir=mask_zarr_dir,
                     img_path=self.img_path,
@@ -167,7 +169,7 @@ class Pipeline:
                 channel_arrays.update(ch_arrays)
 
         # Build final DataFrame (one allocation, outside tempdir)
-        result = build_output(morph_df, valid_labels, channel_arrays)
+        result = build_output(morph_df, channel_arrays)
         result = apply_precision(result)
 
         out_path = write_table(
