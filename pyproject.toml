@@ -3,7 +3,7 @@ requires = ["setuptools>=64", "setuptools-scm"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "mcquant"
+name = "chunkprop"
 version = "0.1.0"
 requires-python = ">=3.10"
 dependencies = [
@@ -19,10 +19,10 @@ dependencies = [
 ]
 
 [project.scripts]
-mcquant = "mcquant.cli:main"
+chunkprop = "chunkprop.cli:main"
 
 [tool.setuptools]
-packages = ["mcquant"]
+packages = ["chunkprop"]
 
 [tool.setuptools.package-dir]
 "" = "."

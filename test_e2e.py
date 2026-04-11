@@ -19,7 +19,7 @@ import tifffile
 import pytest
 
 sys.path.insert(0, str(pathlib.Path(__file__).parent))
-import mcquant
+import chunkprop
 
 
 # ---------------------------------------------------------------------------- #
@@ -80,7 +80,7 @@ def test_all_cells_found(tmp_path):
     mask_path, img_path, markers, expected, n_cells = make_synthetic_data(tmp_path)
     out = str(tmp_path / "output")
 
-    mcquant.ExtractSingleCells(
+    chunkprop.ExtractSingleCells(
         masks=[mask_path],
         image=img_path,
         channel_names=markers,
@@ -100,7 +100,7 @@ def test_centroids_are_global(tmp_path):
         tmp_path, img_h=512, img_w=512, tile_size=64  # small tiles → many chunks
     )
     out = str(tmp_path / "output")
-    mcquant.ExtractSingleCells(
+    chunkprop.ExtractSingleCells(
         masks=[mask_path], image=img_path, channel_names=markers, output=out, n_jobs=2
     )
     df = pd.read_csv(list(pathlib.Path(out).glob("*.csv"))[0])
@@ -120,7 +120,7 @@ def test_column_order(tmp_path):
     """CellID first, morphology tail last, intensity columns in middle."""
     mask_path, img_path, markers, _, _ = make_synthetic_data(tmp_path)
     out = str(tmp_path / "output")
-    mcquant.ExtractSingleCells(
+    chunkprop.ExtractSingleCells(
         masks=[mask_path], image=img_path, channel_names=markers, output=out, n_jobs=2
     )
     df = pd.read_csv(list(pathlib.Path(out).glob("*.csv"))[0])
@@ -142,7 +142,7 @@ def test_intensity_values(tmp_path):
         tmp_path, n_channels=2
     )
     out = str(tmp_path / "output")
-    mcquant.ExtractSingleCells(
+    chunkprop.ExtractSingleCells(
         masks=[mask_path], image=img_path, channel_names=markers, output=out, n_jobs=2
     )
     df = pd.read_csv(list(pathlib.Path(out).glob("*.csv"))[0]).set_index("CellID")
@@ -159,7 +159,7 @@ def test_intensity_values(tmp_path):
 
 
 def test_chunk_size_snap():
-    from mcquant._chunks import compute_chunk_size
+    from chunkprop._chunks import compute_chunk_size
     assert compute_chunk_size(1024) == 4096
     assert compute_chunk_size(1240) == 3720
     assert compute_chunk_size(256) == 4096

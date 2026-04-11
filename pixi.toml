@@ -1,5 +1,5 @@
 [project]
-name = "mcquant"
+name = "chunkprop"
 version = "0.1.0"
 description = "Single-cell spatial quantification from multiplexed imaging"
 channels = ["conda-forge"]

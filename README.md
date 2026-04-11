@@ -1,4 +1,4 @@
-# mcquant
+# chunkprop
 
 Single-cell spatial quantification from multiplexed imaging.  
 Extracts per-cell morphological and intensity measurements from segmentation
@@ -34,7 +34,7 @@ pixi install
 ## CLI usage
 
 ```bash
-mcquant \
+chunkprop \
   --mask  segmentation/cellRing.ome.tif \
   --image registration/image.ome.tif \
   --channel-names markers.csv \
@@ -44,7 +44,7 @@ mcquant \
 Multiple masks are each quantified independently:
 
 ```bash
-mcquant \
+chunkprop \
   --mask segmentation/cellRing.ome.tif segmentation/nucleiMask.ome.tif \
   --image registration/image.ome.tif \
   --channel-names markers.csv \
@@ -109,14 +109,14 @@ Specify with `--intensity-props`:
 Example:
 
 ```bash
-mcquant --mask ... --image ... --channel-names ... --output ... \
+chunkprop --mask ... --image ... --channel-names ... --output ... \
         --intensity-props gini_index intensity_median
 ```
 
 ## Python API
 
 ```python
-from mcquant import Pipeline
+from chunkprop import Pipeline
 
 Pipeline(
     mask_paths=["segmentation/cellRing.ome.tif"],
@@ -128,11 +128,11 @@ Pipeline(
 ).run()
 ```
 
-Backward-compatible wrappers matching the original mcquant API are also
+Backward-compatible wrappers matching the original chunkprop API are also
 available:
 
 ```python
-from mcquant import MultiExtractSingleCells
+from chunkprop import MultiExtractSingleCells
 
 MultiExtractSingleCells(
     masks=["segmentation/cellRing.ome.tif"],

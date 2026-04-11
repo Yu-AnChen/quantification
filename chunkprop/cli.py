@@ -1,5 +1,5 @@
 """
-Command-line interface for mcquant.
+Command-line interface for chunkprop.
 """
 import argparse
 import logging
@@ -9,7 +9,7 @@ from .pipeline import Pipeline
 
 def main(argv=None) -> None:
     parser = argparse.ArgumentParser(
-        prog="mcquant",
+        prog="chunkprop",
         description="Single-cell spatial quantification from multiplexed imaging.",
     )
 

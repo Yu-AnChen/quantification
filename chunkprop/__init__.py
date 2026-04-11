@@ -1,5 +1,5 @@
 """
-mcquant — chunk-based single-cell spatial quantification.
+chunkprop — chunk-based single-cell spatial quantification.
 
 Public API
 ----------
@@ -25,7 +25,7 @@ def ExtractSingleCells(
     chunk_size=None,
     output_format="csv",
 ):
-    """Backward-compatible wrapper matching the ori mcquant API."""
+    """Backward-compatible wrapper matching the original mcquant API."""
     Pipeline(
         mask_paths=list(masks),
         img_path=image,
@@ -51,7 +51,7 @@ def MultiExtractSingleCells(
     output_format="csv",
 ):
     """Backward-compatible wrapper (ori used this for the multi-image loop)."""
-    print(f"Extracting single-cell data for {image}…")
+    logging.getLogger(__name__).info("Extracting single-cell data for %s", image)
     ExtractSingleCells(
         masks, image, channel_names, output,
         mask_props=mask_props,
