@@ -2,6 +2,7 @@
 Pipeline: orchestrates mask loading, zarr conversion, overlap computation,
 morphology pass, per-channel intensity passes, and CSV/parquet output.
 """
+import logging
 import os
 import tempfile
 
@@ -12,6 +13,8 @@ from ._chunks import compute_chunk_size, compute_overlap, mask_to_zarr
 from ._io import get_img_metadata, load_marker_csv, validate_masks, write_table
 from ._props import apply_precision, validate_props
 from ._quantify import build_output, intensity_pass, morphology_pass
+
+log = logging.getLogger(__name__)
 
 
 class Pipeline:
@@ -93,17 +96,18 @@ class Pipeline:
         else:
             self._img_mode = "tiff_nontiled"
 
-        print(
-            f"Image: {img_meta['n_channels']} channels, "
-            f"shape {img_meta['shape']}, "
-            f"tile_size={img_meta['tile_size']}, "
-            f"chunk_size={self._chunk_size}, "
-            f"mode={self._img_mode}"
+        log.info(
+            "Image: %d channels, shape %s, tile_size=%s, chunk_size=%d, mode=%s",
+            img_meta["n_channels"],
+            img_meta["shape"],
+            img_meta["tile_size"],
+            self._chunk_size,
+            self._img_mode,
         )
 
     def run(self) -> None:
         for mask_path in self.mask_paths:
-            print(f"\n=== Mask: {os.path.basename(mask_path)} ===")
+            log.info("Processing mask: %s", os.path.basename(mask_path))
             self._run_mask(mask_path)
 
     def _run_mask(self, mask_path: str) -> None:
@@ -118,7 +122,7 @@ class Pipeline:
             mask_zarr_dir = os.path.join(tmp_dir, "mask.zarr")
 
             # Write mask to zarr temp store
-            print("Converting mask to zarr store…")
+            log.info("Converting mask to zarr store")
             mask_to_zarr(mask, self._chunk_size, mask_zarr_dir)
             # Free the numpy mask — zarr is now the source of truth
             del mask
@@ -127,7 +131,7 @@ class Pipeline:
             overlap = compute_overlap(
                 mask_zarr_dir, self._mask_shape, self._chunk_size, self.n_jobs
             )
-            print(f"Overlap: {overlap} px")
+            log.info("Overlap: %d px", overlap)
 
             # Morphology pass
             morph_df = morphology_pass(
@@ -140,7 +144,7 @@ class Pipeline:
             )
             valid_labels = morph_df["CellID"].to_numpy(dtype=np.int64)
             max_label = int(valid_labels.max())
-            print(f"Cells found: {len(valid_labels)}, max label: {max_label}")
+            log.info("Cells found: %d  (max label: %d)", len(valid_labels), max_label)
 
             # Intensity passes — one per channel
             channel_arrays: dict[str, np.ndarray] = {}
@@ -173,4 +177,4 @@ class Pipeline:
             self.img_path,
             self.output_format,
         )
-        print(f"Written: {out_path}")
+        log.info("Written: %s", out_path)

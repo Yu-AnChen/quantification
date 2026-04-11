@@ -1,12 +1,15 @@
 """
 Image and mask I/O utilities.
 """
+import logging
 import pathlib
 import warnings
 
 import h5py
 import pandas as pd
 import tifffile
+
+log = logging.getLogger(__name__)
 
 
 def get_img_metadata(img_path: str) -> dict:
@@ -85,9 +88,9 @@ def load_marker_csv(csv_path: str) -> list[str]:
     path = pathlib.Path(csv_path)
     df = pd.read_csv(path)
     if "marker_name" not in df.columns:
-        print(
-            f"'marker_name' column not found in {path.name}; "
-            "assuming legacy single-column format."
+        log.warning(
+            "'marker_name' column not found in %s; assuming legacy single-column format.",
+            path.name,
         )
         df = pd.read_csv(path, header=None, usecols=[0], names=["marker_name"])
 

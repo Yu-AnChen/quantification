@@ -6,7 +6,12 @@ Public API
 Pipeline          : main entry point
 ExtractSingleCells / MultiExtractSingleCells : backward-compatible wrappers
 """
+import logging
+
 from .pipeline import Pipeline
+
+# Library-level NullHandler: callers configure logging, we don't force any output.
+logging.getLogger(__name__).addHandler(logging.NullHandler())
 
 
 def ExtractSingleCells(
