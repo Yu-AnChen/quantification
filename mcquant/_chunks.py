@@ -1,14 +1,12 @@
 """
 Chunk coordinate computation, overlap estimation, and mask zarr conversion.
 """
-import os
 from typing import Iterator
 
 import joblib
 import numpy as np
 import skimage.measure
 import skimage.segmentation
-import tifffile
 import tqdm
 import zarr
 

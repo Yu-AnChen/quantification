@@ -11,7 +11,6 @@ Intensity pass  : two pre-allocated numpy arrays of length (max_label + 1);
 
 Neither pass materialises more than ``n_jobs`` chunks at once.
 """
-import warnings
 
 import h5py
 import joblib

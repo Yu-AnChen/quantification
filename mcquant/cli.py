@@ -2,7 +2,6 @@
 Command-line interface for mcquant.
 """
 import argparse
-import sys
 
 from .pipeline import Pipeline
 

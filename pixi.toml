@@ -18,6 +18,7 @@ tqdm = ">=4.66"
 h5py = ">=3.11"
 imagecodecs = ">=2024.9"
 pip = ">=26.0.1,<27"
+ruff = ">=0.15.10,<0.16"
 
 [feature.dev.dependencies]
 pytest = ">=8.0"
