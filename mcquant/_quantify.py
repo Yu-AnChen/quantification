@@ -35,7 +35,7 @@ def _morph_worker(
     rrs: int, rre: int, ccs: int, cce: int,
     props: tuple[str, ...],
 ) -> tuple[dict, int, int]:
-    z = zarr.open(zarr.DirectoryStore(mask_zarr_dir), mode="r")
+    z = zarr.open_array(mask_zarr_dir, mode="r")
     chunk = np.asarray(z[rrs:rre, ccs:cce])
     result = skimage.measure.regionprops_table(chunk, properties=props)
     # Return raw dict + offsets; centroid correction applied in the main process
@@ -50,7 +50,7 @@ def _intensity_worker_tiled(
     builtin_props: tuple[str, ...],
     extra_prop_names: tuple[str, ...],
 ) -> dict:
-    mask_z = zarr.open(zarr.DirectoryStore(mask_zarr_dir), mode="r")
+    mask_z = zarr.open_array(mask_zarr_dir, mode="r")
     img_z = zarr.open(tifffile.imread(img_path, aszarr=True, level=0), mode="r")
 
     chunk_mask = np.asarray(mask_z[rrs:rre, ccs:cce])
@@ -73,7 +73,7 @@ def _intensity_worker_nontiled(
     extra_prop_names: tuple[str, ...],
 ) -> dict:
     """Used for non-tiled TIFFs and HDF5 (full channel already in RAM)."""
-    mask_z = zarr.open(zarr.DirectoryStore(mask_zarr_dir), mode="r")
+    mask_z = zarr.open_array(mask_zarr_dir, mode="r")
     chunk_mask = np.asarray(mask_z[rrs:rre, ccs:cce])
     chunk_img = full_channel[rrs:rre, ccs:cce]
 

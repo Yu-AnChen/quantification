@@ -41,17 +41,15 @@ def compute_chunk_size(tile_size: int | None, user_override: int | None = None) 
 
 def mask_to_zarr(mask: np.ndarray, chunk_size: int, store_path: str) -> None:
     """
-    Write a 2-D integer mask to a zarr DirectoryStore with blosc compression.
+    Write a 2-D integer mask to a zarr DirectoryStore.
     Each worker will re-open this store independently.
     """
-    store = zarr.DirectoryStore(store_path)
-    z = zarr.open(
-        store,
+    z = zarr.open_array(
+        store_path,
         mode="w",
         shape=mask.shape,
         dtype=mask.dtype,
         chunks=(chunk_size, chunk_size),
-        compressor=zarr.Blosc(cname="lz4", clevel=5, shuffle=zarr.Blosc.SHUFFLE),
     )
     z[:] = mask
 
@@ -112,7 +110,7 @@ def _edge_distances(mask_chunk: np.ndarray) -> np.ndarray:
 
 
 def _edge_worker(mask_zarr_dir: str, rrs: int, rre: int, ccs: int, cce: int) -> np.ndarray:
-    z = zarr.open(zarr.DirectoryStore(mask_zarr_dir), mode="r")
+    z = zarr.open_array(mask_zarr_dir, mode="r")
     chunk = np.asarray(z[rrs:rre, ccs:cce])
     return _edge_distances(chunk)
 
