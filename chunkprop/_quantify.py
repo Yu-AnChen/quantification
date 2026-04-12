@@ -36,7 +36,7 @@ def _morph_worker(
     rrs: int, rre: int, ccs: int, cce: int,
     props: tuple[str, ...],
 ) -> tuple[dict, int, int]:
-    z = zarr.open_array(pathlib.Path(mask_zarr_dir), mode="r")
+    z = zarr.open_array(pathlib.Path(mask_zarr_dir), mode="r", zarr_format=2)
     chunk = np.asarray(z[rrs:rre, ccs:cce])
     result = skimage.measure.regionprops_table(chunk, properties=props)
     # Return raw dict + offsets; centroid correction applied in the main process

@@ -40,15 +40,20 @@ def compute_chunk_size(tile_size: int | None, user_override: int | None = None) 
 
 def mask_to_zarr(mask: np.ndarray, chunk_size: int, store_path: str) -> None:
     """
-    Write a 2-D integer mask to a zarr DirectoryStore.
+    Write a 2-D integer mask to a zarr v2 DirectoryStore.
     Each worker will re-open this store independently.
+
+    zarr_format=2 is explicit because:
+      - zarr v3 format does not register uint32/int32 by default
+      - zarr v2 format bypasses zarr 3's broken Windows file:// URI encoding
     """
     z = zarr.open_array(
-        pathlib.Path(store_path),   # Path avoids zarr's broken Windows file:// URI encoding
+        pathlib.Path(store_path),
         mode="w",
         shape=mask.shape,
         dtype=mask.dtype,
         chunks=(chunk_size, chunk_size),
+        zarr_format=2,
     )
     z[:] = mask
 
@@ -109,7 +114,7 @@ def _edge_distances(mask_chunk: np.ndarray) -> np.ndarray:
 
 
 def _edge_worker(mask_zarr_dir: str, rrs: int, rre: int, ccs: int, cce: int) -> np.ndarray:
-    z = zarr.open_array(pathlib.Path(mask_zarr_dir), mode="r")
+    z = zarr.open_array(pathlib.Path(mask_zarr_dir), mode="r", zarr_format=2)
     chunk = np.asarray(z[rrs:rre, ccs:cce])
     return _edge_distances(chunk)
 
