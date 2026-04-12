@@ -1,6 +1,7 @@
 """
 Chunk coordinate computation, overlap estimation, and mask zarr conversion.
 """
+import pathlib
 from typing import Iterator
 
 import joblib
@@ -43,7 +44,7 @@ def mask_to_zarr(mask: np.ndarray, chunk_size: int, store_path: str) -> None:
     Each worker will re-open this store independently.
     """
     z = zarr.open_array(
-        store_path,
+        pathlib.Path(store_path),   # Path avoids zarr's broken Windows file:// URI encoding
         mode="w",
         shape=mask.shape,
         dtype=mask.dtype,
@@ -108,7 +109,7 @@ def _edge_distances(mask_chunk: np.ndarray) -> np.ndarray:
 
 
 def _edge_worker(mask_zarr_dir: str, rrs: int, rre: int, ccs: int, cce: int) -> np.ndarray:
-    z = zarr.open_array(mask_zarr_dir, mode="r")
+    z = zarr.open_array(pathlib.Path(mask_zarr_dir), mode="r")
     chunk = np.asarray(z[rrs:rre, ccs:cce])
     return _edge_distances(chunk)
 

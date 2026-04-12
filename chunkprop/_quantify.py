@@ -12,6 +12,8 @@ Intensity pass  : two pre-allocated numpy arrays of length (max_label + 1);
 Neither pass materialises more than ``n_jobs`` chunks at once.
 """
 
+import pathlib
+
 import h5py
 import joblib
 import numpy as np
@@ -34,7 +36,7 @@ def _morph_worker(
     rrs: int, rre: int, ccs: int, cce: int,
     props: tuple[str, ...],
 ) -> tuple[dict, int, int]:
-    z = zarr.open_array(mask_zarr_dir, mode="r")
+    z = zarr.open_array(pathlib.Path(mask_zarr_dir), mode="r")
     chunk = np.asarray(z[rrs:rre, ccs:cce])
     result = skimage.measure.regionprops_table(chunk, properties=props)
     # Return raw dict + offsets; centroid correction applied in the main process
