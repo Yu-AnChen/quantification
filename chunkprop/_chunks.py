@@ -40,12 +40,12 @@ def compute_chunk_size(tile_size: int | None, user_override: int | None = None) 
 
 def mask_to_zarr(mask: np.ndarray, chunk_size: int, store_path: str) -> None:
     """
-    Write a 2-D integer mask to a zarr v2 DirectoryStore.
+    Write a 2-D integer mask to a zarr v2 store.
     Each worker will re-open this store independently.
 
-    zarr_format=2 is explicit because:
-      - zarr v3 format does not register uint32/int32 by default
-      - zarr v2 format bypasses zarr 3's broken Windows file:// URI encoding
+    zarr_format=2 is pinned for broad compatibility: early zarr 3.x releases
+    had incomplete dtype registries and Windows file:// URI issues that
+    zarr v2 format avoids.
     """
     z = zarr.open_array(
         pathlib.Path(store_path),
