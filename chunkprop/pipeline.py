@@ -7,7 +7,6 @@ import os
 import tempfile
 
 import numpy as np
-import tifffile
 
 from ._chunks import compute_chunk_size, compute_overlap, mask_to_zarr
 from ._io import get_img_metadata, load_marker_csv, validate_masks, write_table
@@ -111,21 +110,11 @@ class Pipeline:
             self._run_mask(mask_path)
 
     def _run_mask(self, mask_path: str) -> None:
-        # Load mask (int32, one-time allocation)
-        mask = tifffile.imread(mask_path)
-        if mask.ndim != 2:
-            raise ValueError(
-                f"Expected 2D mask, got shape {mask.shape} from {mask_path}."
-            )
-
         with tempfile.TemporaryDirectory() as tmp_dir:
             mask_zarr_dir = os.path.join(tmp_dir, "mask.zarr")
 
-            # Write mask to zarr temp store
             log.info("Converting mask to zarr store")
-            mask_to_zarr(mask, self._chunk_size, mask_zarr_dir)
-            # Free the numpy mask — zarr is now the source of truth
-            del mask
+            mask_to_zarr(mask_path, self._chunk_size, mask_zarr_dir)
 
             # Compute required overlap
             overlap = compute_overlap(

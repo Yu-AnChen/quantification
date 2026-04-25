@@ -8,6 +8,7 @@ import joblib
 import numpy as np
 import skimage.measure
 import skimage.segmentation
+import tifffile
 import tqdm
 import zarr
 
@@ -38,24 +39,30 @@ def compute_chunk_size(tile_size: int | None, user_override: int | None = None) 
     return n_tiles * tile_size
 
 
-def mask_to_zarr(mask: np.ndarray, chunk_size: int, store_path: str) -> None:
+def mask_to_zarr(mask_path: str, chunk_size: int, store_path: str) -> None:
     """
-    Write a 2-D integer mask to a zarr v2 store.
-    Each worker will re-open this store independently.
+    Stream a 2-D integer mask TIFF into a zarr store one chunk-row at a time.
 
-    zarr_format=2 is pinned for broad compatibility: early zarr 3.x releases
-    had incomplete dtype registries and Windows file:// URI issues that
-    zarr v2 format avoids.
+    Uses TiffFile.aszarr() for a lazy, zarr-compatible view of the TIFF so only
+    one chunk-row is live in RAM at a time.  For tiled TIFFs this reads only the
+    relevant tiles; for strip-based TIFFs it reads the relevant strips.
     """
-    z = zarr.open_array(
-        pathlib.Path(store_path),
-        mode="w",
-        shape=mask.shape,
-        dtype=mask.dtype,
-        chunks=(chunk_size, chunk_size),
-        zarr_format=2,
-    )
-    z[:] = mask
+    with tifffile.TiffFile(mask_path) as tf:
+        src = zarr.open(tf.aszarr(), mode="r")
+        if not isinstance(src, zarr.Array):
+            src = src[str(0)]  # OME-TIFF group hierarchy — take first array
+        h, w = int(src.shape[-2]), int(src.shape[-1])
+
+        dst = zarr.open_array(
+            pathlib.Path(store_path),
+            mode="w",
+            shape=(h, w),
+            dtype=np.int32,
+            chunks=(chunk_size, chunk_size),
+        )
+        for rs in range(0, h, chunk_size):
+            re = min(rs + chunk_size, h)
+            dst[rs:re, :] = src[rs:re, :]
 
 
 def iter_chunk_coords(
@@ -114,7 +121,7 @@ def _edge_distances(mask_chunk: np.ndarray) -> np.ndarray:
 
 
 def _edge_worker(mask_zarr_dir: str, rrs: int, rre: int, ccs: int, cce: int) -> np.ndarray:
-    z = zarr.open_array(pathlib.Path(mask_zarr_dir), mode="r", zarr_format=2)
+    z = zarr.open_array(pathlib.Path(mask_zarr_dir), mode="r")
     chunk = np.asarray(z[rrs:rre, ccs:cce])
     return _edge_distances(chunk)
 
