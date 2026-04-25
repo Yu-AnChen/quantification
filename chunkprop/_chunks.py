@@ -2,6 +2,7 @@
 Chunk coordinate computation, overlap estimation, and mask zarr conversion.
 """
 import pathlib
+import sys
 from typing import Iterator
 
 import joblib
@@ -10,6 +11,7 @@ import skimage.measure
 import skimage.segmentation
 import tifffile
 import tqdm
+from tqdm.contrib.logging import logging_redirect_tqdm
 import zarr
 
 _TARGET_CHUNK = 4096
@@ -155,10 +157,14 @@ def compute_overlap(
     )
 
     max_dist = 0
-    for distances in tqdm.tqdm(gen, total=len(coords), desc="computing overlap", leave=False):
-        d = int(np.max(distances))
-        if d > max_dist:
-            max_dist = d
+    with logging_redirect_tqdm():
+        for distances in tqdm.tqdm(
+            gen, total=len(coords), desc="computing overlap", leave=False,
+            disable=not sys.stderr.isatty(),
+        ):
+            d = int(np.max(distances))
+            if d > max_dist:
+                max_dist = d
 
     overlap = int(_OVERLAP_ALIGN * np.ceil(max_dist / _OVERLAP_ALIGN))
     return overlap

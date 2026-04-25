@@ -13,6 +13,8 @@ Intensity pass  : pre-allocated numpy arrays of length (max_label + 1) —
 Neither pass materialises more than ``n_jobs`` chunks at once.
 """
 
+import sys
+
 import h5py
 import joblib
 import numpy as np
@@ -20,6 +22,7 @@ import pandas as pd
 import skimage.measure
 import tifffile
 import tqdm
+from tqdm.contrib.logging import logging_redirect_tqdm
 import zarr
 
 from ._chunks import iter_chunk_coords
@@ -117,24 +120,28 @@ def morphology_pass(
     # Dict accumulator: label -> property dict (largest area seen wins)
     acc: dict[int, dict] = {}
 
-    for chunk_result, rrs, ccs in tqdm.tqdm(gen, total=len(coords), desc="morphology"):
-        labels = chunk_result["label"]
-        areas = chunk_result["area"]
-        n = len(labels)
-        if n == 0:
-            continue
-        for i in range(n):
-            lbl = int(labels[i])
-            area = int(areas[i])
-            if lbl == 0:
+    with logging_redirect_tqdm():
+        for chunk_result, rrs, ccs in tqdm.tqdm(
+            gen, total=len(coords), desc="morphology",
+            disable=not sys.stderr.isatty(),
+        ):
+            labels = chunk_result["label"]
+            areas = chunk_result["area"]
+            n = len(labels)
+            if n == 0:
                 continue
-            existing = acc.get(lbl)
-            if existing is None or area > existing["area"]:
-                row = {k: chunk_result[k][i] for k in chunk_result}
-                # Apply centroid offset to convert chunk-local → global coords
-                row["centroid-0"] = row["centroid-0"] + rrs
-                row["centroid-1"] = row["centroid-1"] + ccs
-                acc[lbl] = row
+            for i in range(n):
+                lbl = int(labels[i])
+                area = int(areas[i])
+                if lbl == 0:
+                    continue
+                existing = acc.get(lbl)
+                if existing is None or area > existing["area"]:
+                    row = {k: chunk_result[k][i] for k in chunk_result}
+                    # Apply centroid offset to convert chunk-local → global coords
+                    row["centroid-0"] = row["centroid-0"] + rrs
+                    row["centroid-1"] = row["centroid-1"] + ccs
+                    acc[lbl] = row
 
     if not acc:
         raise RuntimeError("No labelled cells found in mask.")
@@ -217,30 +224,32 @@ def intensity_pass(
             for rrs, rre, ccs, cce in coords
         )
 
-    for chunk_result in tqdm.tqdm(
-        gen, total=len(coords), desc=f"  {channel_name}", leave=False
-    ):
-        labels = chunk_result["label"]
-        areas = chunk_result["area"]
-        if len(labels) == 0:
-            continue
+    with logging_redirect_tqdm():
+        for chunk_result in tqdm.tqdm(
+            gen, total=len(coords), desc=f"  {channel_name}", leave=False,
+            disable=not sys.stderr.isatty(),
+        ):
+            labels = chunk_result["label"]
+            areas = chunk_result["area"]
+            if len(labels) == 0:
+                continue
 
-        # Clip to pre-allocated range (labels outside max_label are background/artifacts)
-        in_range = labels <= max_label
-        labels = labels[in_range]
-        areas = areas[in_range]
+            # Clip to pre-allocated range (labels outside max_label are background/artifacts)
+            in_range = labels <= max_label
+            labels = labels[in_range]
+            areas = areas[in_range]
 
-        better = areas > best_area[labels]
-        win_labels = labels[better]
-        if len(win_labels) == 0:
-            continue
+            better = areas > best_area[labels]
+            win_labels = labels[better]
+            if len(win_labels) == 0:
+                continue
 
-        best_area[win_labels] = areas[better]
-        for key in prop_keys:
-            # Extra props may generate columns like 'gini_index' directly
-            src_key = key if key in chunk_result else _find_extra_key(chunk_result, key)
-            if src_key is not None:
-                accs[key][win_labels] = chunk_result[src_key][in_range][better]
+            best_area[win_labels] = areas[better]
+            for key in prop_keys:
+                # Extra props may generate columns like 'gini_index' directly
+                src_key = key if key in chunk_result else _find_extra_key(chunk_result, key)
+                if src_key is not None:
+                    accs[key][win_labels] = chunk_result[src_key][in_range][better]
 
     # Slice to valid labels only
     result: dict[str, np.ndarray] = {}
