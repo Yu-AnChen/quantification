@@ -153,7 +153,7 @@ def write_table(
     """
     Write per-mask quantification table.
 
-    Filename format matches ori: ``{img_stem}_{mask_stem}.csv``
+    Filename format matches ori: ``{img_stem}_{mask_stem}.{csv|parquet}``
     Written with ``index=False`` (CellID is a regular column).
     """
     out = pathlib.Path(output_dir)

@@ -5,8 +5,9 @@ RAM contract
 ------------
 Morphology pass : dict accumulator — one entry per cell, updated in-place as
                   chunks arrive; no intermediate DataFrames.
-Intensity pass  : two pre-allocated numpy arrays of length (max_label + 1);
-                  updated in-place per chunk; one column added to the output
+Intensity pass  : pre-allocated numpy arrays of length (max_label + 1) —
+                  one per intensity property plus one for best-area tracking;
+                  updated in-place per chunk; columns added to the output
                   DataFrame at the end of each channel.
 
 Neither pass materialises more than ``n_jobs`` chunks at once.
