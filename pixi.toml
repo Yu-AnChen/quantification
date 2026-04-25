@@ -26,7 +26,7 @@ chunkprop = { path = ".", editable = true }
 [feature.dev.pypi-dependencies]
 pytest = ">=8.0"
 ipykernel = ">=6.0"
-memory-profiler = ">=0.61"
+scalene = ">=2"
 
 [environments]
 dev = { features = ["dev"], solve-group = "default" }
