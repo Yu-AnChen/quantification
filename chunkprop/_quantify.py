@@ -112,7 +112,7 @@ def morphology_pass(
 
     coords = list(iter_chunk_coords(shape, chunk_size, overlap))
 
-    gen = joblib.Parallel(backend="loky", n_jobs=n_jobs, return_as="generator")(
+    gen = joblib.Parallel(backend="loky", n_jobs=n_jobs, return_as="generator_unordered")(
         joblib.delayed(_morph_worker)(mask_zarr_dir, rrs, rre, ccs, cce, tuple(props))
         for rrs, rre, ccs, cce in coords
     )
@@ -204,7 +204,7 @@ def intensity_pass(
     coords = list(iter_chunk_coords(shape, chunk_size, overlap))
 
     if img_format == "tiff_tiled":
-        gen = joblib.Parallel(backend="loky", n_jobs=n_jobs, return_as="generator")(
+        gen = joblib.Parallel(backend="loky", n_jobs=n_jobs, return_as="generator_unordered")(
             joblib.delayed(_intensity_worker_tiled)(
                 mask_zarr_dir, img_path, channel_idx,
                 rrs, rre, ccs, cce,
@@ -215,7 +215,7 @@ def intensity_pass(
     else:
         # Non-tiled TIFF or HDF5: load full channel once, slice per chunk in threads
         full_channel = _load_full_channel(img_path, img_format, hdf5_key, channel_idx)
-        gen = joblib.Parallel(backend="threading", n_jobs=n_jobs, return_as="generator")(
+        gen = joblib.Parallel(backend="threading", n_jobs=n_jobs, return_as="generator_unordered")(
             joblib.delayed(_intensity_worker_nontiled)(
                 mask_zarr_dir, full_channel,
                 rrs, rre, ccs, cce,
