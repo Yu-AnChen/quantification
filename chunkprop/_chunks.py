@@ -4,6 +4,7 @@ Chunk coordinate computation, overlap estimation, and mask zarr conversion.
 import pathlib
 import sys
 from typing import Iterator
+import warnings
 
 import joblib
 import numpy as np
@@ -139,7 +140,11 @@ def compute_overlap(
 
     Processes non-overlapping blocks in parallel (threading, I/O-bound),
     then rounds the maximum distance up to the nearest multiple of
-    ``_OVERLAP_ALIGN``.
+    ``_OVERLAP_ALIGN``.  The result is capped at ``chunk_size - _OVERLAP_ALIGN``
+    so that overlap never reaches chunk_size (which would cause adjacent chunks
+    to start at the same offset, defeating chunked processing).  A warning is
+    emitted when the cap is applied; cells larger than the cap will appear in
+    multiple chunks and the largest-area instance is used.
     """
     h, w = shape
     nr = int(np.ceil(h / chunk_size))
@@ -167,4 +172,14 @@ def compute_overlap(
                 max_dist = d
 
     overlap = int(_OVERLAP_ALIGN * np.ceil(max_dist / _OVERLAP_ALIGN))
+    cap = chunk_size - _OVERLAP_ALIGN
+    if overlap > cap:
+        warnings.warn(
+            f"Largest border-touching cell requires {overlap} px overlap but "
+            f"chunk_size={chunk_size}. Capping overlap at {cap} px; cells larger "
+            "than the cap will appear in multiple chunks (largest-area instance used).",
+            UserWarning,
+            stacklevel=2,
+        )
+        overlap = cap
     return overlap
