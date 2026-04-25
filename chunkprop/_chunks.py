@@ -120,7 +120,7 @@ def _edge_distances(mask_chunk: np.ndarray) -> np.ndarray:
             w - min_col[max_col == w],      # touching right:  extent leftward
         ]
     )
-    return distances if len(distances) else np.array([0], dtype=np.int64)
+    return distances
 
 
 def _edge_worker(mask_zarr_dir: str, rrs: int, rre: int, ccs: int, cce: int) -> np.ndarray:
