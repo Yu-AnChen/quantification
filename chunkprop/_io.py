@@ -1,6 +1,7 @@
 """
 Image and mask I/O utilities.
 """
+
 import logging
 import pathlib
 import warnings
@@ -15,11 +16,12 @@ log = logging.getLogger(__name__)
 def get_img_metadata(img_path: str) -> dict:
     """
     Return a dict describing the image:
-      format     : 'tiff' | 'hdf5'
-      n_channels : int
-      shape      : (H, W)
-      tile_size  : int | None   (None = not tiled or HDF5)
-      hdf5_key   : str | None   (HDF5 dataset name, if applicable)
+      format       : 'tiff' | 'hdf5'
+      n_channels   : int
+      shape        : (H, W)
+      tile_size    : int | None   (None = not tiled or HDF5)
+      hdf5_key     : str | None   (HDF5 dataset name, if applicable)
+      channel_axis : int | None   (axis of C in the series shape; None = 2D/HDF5)
     """
     path = pathlib.Path(img_path)
 
@@ -34,6 +36,7 @@ def get_img_metadata(img_path: str) -> dict:
                 "shape": (s[1], s[2]),
                 "tile_size": None,
                 "hdf5_key": key,
+                "channel_axis": None,  # HDF5 uses hardcoded [0, :, :, ch] indexing
             }
 
     # TIFF branch
@@ -41,14 +44,24 @@ def get_img_metadata(img_path: str) -> dict:
         series = tf.series[0]
         s = series.shape
         ndim = len(s)
+        # Normalise axes: tifffile uses 'S' for RGB samples; treat as 'C'.
+        axes = series.axes.upper().replace("S", "C")
+
         if ndim == 2:
-            n_channels, img_shape = 1, s
+            n_channels = 1
+            img_shape = s
+            channel_axis = None
         elif ndim == 3:
-            n_channels, img_shape = s[0], s[1:]
+            if "C" not in axes:
+                raise ValueError(
+                    f"Cannot identify channel axis in axes '{series.axes}' "
+                    f"for shape {s}. Expected axes containing 'C' or 'S'."
+                )
+            channel_axis = axes.index("C")
+            n_channels = s[channel_axis]
+            img_shape = tuple(s[i] for i in range(3) if i != channel_axis)
         else:
-            raise ValueError(
-                f"Only 2D/3D images are supported; got {ndim}D shape {s}."
-            )
+            raise ValueError(f"Only 2D/3D images are supported; got {ndim}D shape {s}.")
 
         page = series.levels[0].pages[0]
         if page.is_tiled:
@@ -75,6 +88,7 @@ def get_img_metadata(img_path: str) -> dict:
         "shape": tuple(img_shape),
         "tile_size": tile_size,
         "hdf5_key": None,
+        "channel_axis": channel_axis,
     }
 
 
@@ -97,10 +111,7 @@ def load_marker_csv(csv_path: str) -> list[str]:
     dupes = df.duplicated(subset="marker_name", keep=False)
     if dupes.any():
         suffix = (
-            df.loc[dupes]
-            .groupby("marker_name")
-            .cumcount()
-            .map(lambda x: f"_{x + 1}")
+            df.loc[dupes].groupby("marker_name").cumcount().map(lambda x: f"_{x + 1}")
         )
         df.loc[dupes, "marker_name"] = df.loc[dupes, "marker_name"] + suffix
 
@@ -120,9 +131,7 @@ def validate_masks(mask_paths: list[str]) -> tuple[int, int]:
         with tifffile.TiffFile(p) as tf:
             s = tf.series[0].shape
         if len(s) != 2:
-            raise ValueError(
-                f"Only 2D masks are supported; {p.name} has shape {s}."
-            )
+            raise ValueError(f"Only 2D masks are supported; {p.name} has shape {s}.")
         shapes.append(s)
 
     if len(set(shapes)) != 1:

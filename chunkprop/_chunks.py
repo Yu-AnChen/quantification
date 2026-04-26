@@ -74,13 +74,17 @@ def mask_to_zarr(mask_path: str, chunk_size: int, store_path: str) -> None:
             if is_tiled:
                 coords = list(iter_chunk_coords((h, w), chunk_size, overlap=0))
                 for rrs, rre, ccs, cce in tqdm.tqdm(
-                    coords, desc="mask → zarr", leave=False,
+                    coords,
+                    desc="mask → zarr",
+                    leave=False,
                     disable=not sys.stderr.isatty(),
                 ):
                     dst[rrs:rre, ccs:cce] = src[rrs:rre, ccs:cce]
             else:
                 for rs in tqdm.tqdm(
-                    range(0, h, chunk_size), desc="mask → zarr", leave=False,
+                    range(0, h, chunk_size),
+                    desc="mask → zarr",
+                    leave=False,
                     disable=not sys.stderr.isatty(),
                 ):
                     re = min(rs + chunk_size, h)

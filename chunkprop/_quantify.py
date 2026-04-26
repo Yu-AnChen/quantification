@@ -33,9 +33,13 @@ from ._props import EXTRA_PROPS, MORPHOLOGY_PROPS, NAME_MAP, TAIL_COLS
 #                               Worker functions                               #
 # ---------------------------------------------------------------------------- #
 
+
 def _morph_worker(
     mask_zarr_dir: str,
-    rrs: int, rre: int, ccs: int, cce: int,
+    rrs: int,
+    rre: int,
+    ccs: int,
+    cce: int,
     props: tuple[str, ...],
 ) -> tuple[dict, int, int]:
     z = zarr.open_array(mask_zarr_dir, mode="r")
@@ -49,20 +53,31 @@ def _intensity_worker_tiled(
     mask_zarr_dir: str,
     img_path: str,
     channel_idx: int,
-    rrs: int, rre: int, ccs: int, cce: int,
+    rrs: int,
+    rre: int,
+    ccs: int,
+    cce: int,
     builtin_props: tuple[str, ...],
     extra_prop_names: tuple[str, ...],
+    channel_axis: int | None,
 ) -> dict:
     mask_z = zarr.open_array(mask_zarr_dir, mode="r")
     img_z = zarr.open(tifffile.imread(img_path, aszarr=True, level=0), mode="r")
 
     chunk_mask = np.asarray(mask_z[rrs:rre, ccs:cce])
-    # OME-TIFF: shape is (C, H, W)
-    chunk_img = np.asarray(img_z[channel_idx, rrs:rre, ccs:cce])
+    if channel_axis is None:
+        chunk_img = np.asarray(img_z[rrs:rre, ccs:cce])
+    elif channel_axis == 0:
+        chunk_img = np.asarray(img_z[channel_idx, rrs:rre, ccs:cce])
+    elif channel_axis == 2:
+        chunk_img = np.asarray(img_z[rrs:rre, ccs:cce, channel_idx])
+    else:
+        raise ValueError(f"Unsupported channel_axis {channel_axis}")
 
     extra_fns = tuple(EXTRA_PROPS[n] for n in extra_prop_names)
     return skimage.measure.regionprops_table(
-        chunk_mask, chunk_img,
+        chunk_mask,
+        chunk_img,
         properties=builtin_props,
         extra_properties=extra_fns,
     )
@@ -71,7 +86,10 @@ def _intensity_worker_tiled(
 def _intensity_worker_nontiled(
     mask_zarr_dir: str,
     full_channel: np.ndarray,
-    rrs: int, rre: int, ccs: int, cce: int,
+    rrs: int,
+    rre: int,
+    ccs: int,
+    cce: int,
     builtin_props: tuple[str, ...],
     extra_prop_names: tuple[str, ...],
 ) -> dict:
@@ -82,7 +100,8 @@ def _intensity_worker_nontiled(
 
     extra_fns = tuple(EXTRA_PROPS[n] for n in extra_prop_names)
     return skimage.measure.regionprops_table(
-        chunk_mask, chunk_img,
+        chunk_mask,
+        chunk_img,
         properties=builtin_props,
         extra_properties=extra_fns,
     )
@@ -91,6 +110,7 @@ def _intensity_worker_nontiled(
 # ---------------------------------------------------------------------------- #
 #                             Morphology pass                                  #
 # ---------------------------------------------------------------------------- #
+
 
 def morphology_pass(
     mask_zarr_dir: str,
@@ -112,7 +132,9 @@ def morphology_pass(
 
     coords = list(iter_chunk_coords(shape, chunk_size, overlap))
 
-    gen = joblib.Parallel(backend="loky", n_jobs=n_jobs, return_as="generator_unordered")(
+    gen = joblib.Parallel(
+        backend="loky", n_jobs=n_jobs, return_as="generator_unordered"
+    )(
         joblib.delayed(_morph_worker)(mask_zarr_dir, rrs, rre, ccs, cce, tuple(props))
         for rrs, rre, ccs, cce in coords
     )
@@ -122,7 +144,9 @@ def morphology_pass(
 
     with logging_redirect_tqdm():
         for chunk_result, rrs, ccs in tqdm.tqdm(
-            gen, total=len(coords), desc="morphology",
+            gen,
+            total=len(coords),
+            desc="morphology",
             disable=not sys.stderr.isatty(),
         ):
             labels = chunk_result["label"]
@@ -163,6 +187,7 @@ def morphology_pass(
 #                             Intensity pass                                   #
 # ---------------------------------------------------------------------------- #
 
+
 def intensity_pass(
     mask_zarr_dir: str,
     img_path: str,
@@ -177,6 +202,7 @@ def intensity_pass(
     max_label: int,
     intensity_props: list[str] | None,
     n_jobs: int,
+    channel_axis: int | None = None,
 ) -> dict[str, np.ndarray]:
     """
     Quantify one image channel against the mask.
@@ -187,8 +213,7 @@ def intensity_pass(
     # Determine which props to compute
     _props = list(intensity_props) if intensity_props else []
     builtin_props = tuple(
-        p for p in ["label", "area", "intensity_mean"] + _props
-        if p not in EXTRA_PROPS
+        p for p in ["label", "area", "intensity_mean"] + _props if p not in EXTRA_PROPS
     )
     extra_prop_names = tuple(p for p in _props if p in EXTRA_PROPS)
 
@@ -204,29 +229,50 @@ def intensity_pass(
     coords = list(iter_chunk_coords(shape, chunk_size, overlap))
 
     if img_format == "tiff_tiled":
-        gen = joblib.Parallel(backend="loky", n_jobs=n_jobs, return_as="generator_unordered")(
+        gen = joblib.Parallel(
+            backend="loky", n_jobs=n_jobs, return_as="generator_unordered"
+        )(
             joblib.delayed(_intensity_worker_tiled)(
-                mask_zarr_dir, img_path, channel_idx,
-                rrs, rre, ccs, cce,
-                builtin_props, extra_prop_names,
+                mask_zarr_dir,
+                img_path,
+                channel_idx,
+                rrs,
+                rre,
+                ccs,
+                cce,
+                builtin_props,
+                extra_prop_names,
+                channel_axis,
             )
             for rrs, rre, ccs, cce in coords
         )
     else:
         # Non-tiled TIFF or HDF5: load full channel once, slice per chunk in threads
-        full_channel = _load_full_channel(img_path, img_format, hdf5_key, channel_idx)
-        gen = joblib.Parallel(backend="threading", n_jobs=n_jobs, return_as="generator_unordered")(
+        full_channel = _load_full_channel(
+            img_path, img_format, hdf5_key, channel_idx, channel_axis
+        )
+        gen = joblib.Parallel(
+            backend="threading", n_jobs=n_jobs, return_as="generator_unordered"
+        )(
             joblib.delayed(_intensity_worker_nontiled)(
-                mask_zarr_dir, full_channel,
-                rrs, rre, ccs, cce,
-                builtin_props, extra_prop_names,
+                mask_zarr_dir,
+                full_channel,
+                rrs,
+                rre,
+                ccs,
+                cce,
+                builtin_props,
+                extra_prop_names,
             )
             for rrs, rre, ccs, cce in coords
         )
 
     with logging_redirect_tqdm():
         for chunk_result in tqdm.tqdm(
-            gen, total=len(coords), desc=f"  {channel_name}", leave=False,
+            gen,
+            total=len(coords),
+            desc=f"  {channel_name}",
+            leave=False,
             disable=not sys.stderr.isatty(),
         ):
             labels = chunk_result["label"]
@@ -247,7 +293,9 @@ def intensity_pass(
             best_area[win_labels] = areas[better]
             for key in prop_keys:
                 # Extra props may generate columns like 'gini_index' directly
-                src_key = key if key in chunk_result else _find_extra_key(chunk_result, key)
+                src_key = (
+                    key if key in chunk_result else _find_extra_key(chunk_result, key)
+                )
                 if src_key is not None:
                     accs[key][win_labels] = chunk_result[src_key][in_range][better]
 
@@ -272,19 +320,29 @@ def _find_extra_key(chunk_result: dict, prop_name: str) -> str | None:
 
 
 def _load_full_channel(
-    img_path: str, img_format: str, hdf5_key: str | None, channel_idx: int
+    img_path: str,
+    img_format: str,
+    hdf5_key: str | None,
+    channel_idx: int,
+    channel_axis: int | None,
 ) -> np.ndarray:
     if img_format == "hdf5":
         with h5py.File(img_path, "r") as f:
             return np.asarray(f[hdf5_key][0, :, :, channel_idx])
-    else:
-        # Non-tiled TIFF: tifffile reads the z-th page
+    # Non-tiled TIFF: channel_axis == 0 means each channel is a separate page;
+    # channel_axis == 2 (YXC) means channels are interleaved in a single page.
+    if channel_axis is None:
+        return tifffile.imread(img_path)
+    elif channel_axis == 0:
         return tifffile.imread(img_path, key=channel_idx)
+    else:
+        return tifffile.imread(img_path)[..., channel_idx]
 
 
 # ---------------------------------------------------------------------------- #
 #                            Column ordering                                   #
 # ---------------------------------------------------------------------------- #
+
 
 def _reorder_columns(df: pd.DataFrame) -> pd.DataFrame:
     """

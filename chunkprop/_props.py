@@ -1,6 +1,7 @@
 """
 Property definitions, custom extra properties, validation, and precision rounding.
 """
+
 import numpy as np
 import pandas as pd
 import skimage.measure._regionprops as _rp
@@ -87,6 +88,7 @@ def apply_precision(df: pd.DataFrame) -> pd.DataFrame:
 # ---------------------------------------------------------------------------- #
 #                           Custom extra properties                            #
 # ---------------------------------------------------------------------------- #
+
 
 def gini_index(mask, intensity):
     x = intensity[mask].astype(float)

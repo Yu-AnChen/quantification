@@ -6,6 +6,7 @@ Public API
 Pipeline          : main entry point
 ExtractSingleCells / MultiExtractSingleCells : backward-compatible wrappers
 """
+
 import logging
 
 from .pipeline import Pipeline
@@ -53,7 +54,10 @@ def MultiExtractSingleCells(
     """Backward-compatible wrapper (ori used this for the multi-image loop)."""
     logging.getLogger(__name__).info("Extracting single-cell data for %s", image)
     ExtractSingleCells(
-        masks, image, channel_names, output,
+        masks,
+        image,
+        channel_names,
+        output,
         mask_props=mask_props,
         intensity_props=intensity_props,
         n_jobs=n_jobs,

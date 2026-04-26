@@ -1,6 +1,7 @@
 """
 Command-line interface for chunkprop.
 """
+
 import argparse
 import logging
 
@@ -15,7 +16,8 @@ def main(argv=None) -> None:
 
     # Required args (matches ori interface)
     parser.add_argument(
-        "--mask", "-m",
+        "--mask",
+        "-m",
         dest="masks",
         nargs="+",
         required=True,
@@ -23,21 +25,24 @@ def main(argv=None) -> None:
         help="One or more segmentation mask TIFF paths.",
     )
     parser.add_argument(
-        "--image", "-i",
+        "--image",
+        "-i",
         dest="image",
         required=True,
         metavar="IMAGE",
         help="Multichannel OME-TIFF or HDF5 image path.",
     )
     parser.add_argument(
-        "--channel-names", "-c",
+        "--channel-names",
+        "-c",
         dest="channel_names",
         required=True,
         metavar="CSV",
         help="CSV file with channel names (marker_name column or legacy format).",
     )
     parser.add_argument(
-        "--output", "-o",
+        "--output",
+        "-o",
         dest="output",
         required=True,
         metavar="DIR",

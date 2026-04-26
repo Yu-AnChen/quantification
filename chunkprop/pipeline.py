@@ -2,6 +2,7 @@
 Pipeline: orchestrates mask loading, zarr conversion, overlap computation,
 morphology pass, per-channel intensity passes, and CSV/parquet output.
 """
+
 import logging
 import os
 import tempfile
@@ -154,6 +155,7 @@ class Pipeline:
                     max_label=max_label,
                     intensity_props=self.intensity_props,
                     n_jobs=self.n_jobs,
+                    channel_axis=self._img_meta["channel_axis"],
                 )
                 channel_arrays.update(ch_arrays)
 
