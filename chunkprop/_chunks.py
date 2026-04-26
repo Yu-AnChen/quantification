@@ -1,6 +1,7 @@
 """
 Chunk coordinate computation, overlap estimation, and mask zarr conversion.
 """
+
 import pathlib
 import sys
 from typing import Iterator
@@ -44,11 +45,15 @@ def compute_chunk_size(tile_size: int | None, user_override: int | None = None) 
 
 def mask_to_zarr(mask_path: str, chunk_size: int, store_path: str) -> None:
     """
-    Stream a 2-D integer mask TIFF into a zarr store one chunk-row at a time.
+    Copy a 2-D integer mask TIFF into a zarr store using TiffFile.aszarr().
 
-    Uses TiffFile.aszarr() for a lazy, zarr-compatible view of the TIFF so only
-    one chunk-row is live in RAM at a time.  For tiled TIFFs this reads only the
-    relevant tiles; for strip-based TIFFs it reads the relevant strips.
+    Tiled TIFFs: iterates chunk by chunk (no overlap) via iter_chunk_coords so
+    only chunk_size × chunk_size pixels are live in RAM per step; chunk_size is
+    a multiple of tile_size so reads are tile-aligned.
+
+    Non-tiled TIFFs: iterates full-width strips of chunk_size rows. Strips span
+    the full image width so column sub-reads would re-read the same strip data
+    repeatedly; full-width reads minimise I/O at the cost of higher RAM per step.
     """
     with tifffile.TiffFile(mask_path) as tf:
         src = zarr.open(tf.aszarr(), mode="r")
@@ -63,9 +68,23 @@ def mask_to_zarr(mask_path: str, chunk_size: int, store_path: str) -> None:
             dtype=np.int32,
             chunks=(chunk_size, chunk_size),
         )
-        for rs in range(0, h, chunk_size):
-            re = min(rs + chunk_size, h)
-            dst[rs:re, :] = src[rs:re, :]
+
+        is_tiled = tf.series[0].levels[0].pages[0].is_tiled
+        with logging_redirect_tqdm():
+            if is_tiled:
+                coords = list(iter_chunk_coords((h, w), chunk_size, overlap=0))
+                for rrs, rre, ccs, cce in tqdm.tqdm(
+                    coords, desc="mask → zarr", leave=False,
+                    disable=not sys.stderr.isatty(),
+                ):
+                    dst[rrs:rre, ccs:cce] = src[rrs:rre, ccs:cce]
+            else:
+                for rs in tqdm.tqdm(
+                    range(0, h, chunk_size), desc="mask → zarr", leave=False,
+                    disable=not sys.stderr.isatty(),
+                ):
+                    re = min(rs + chunk_size, h)
+                    dst[rs:re, :] = src[rs:re, :]
 
 
 def iter_chunk_coords(
@@ -93,6 +112,7 @@ def iter_chunk_coords(
 #                          Overlap estimation                                  #
 # ---------------------------------------------------------------------------- #
 
+
 def _edge_distances(mask_chunk: np.ndarray) -> np.ndarray:
     """
     For labels touching any edge of ``mask_chunk``, return the distance
@@ -114,16 +134,18 @@ def _edge_distances(mask_chunk: np.ndarray) -> np.ndarray:
 
     distances = np.concatenate(
         [
-            max_row[min_row == 0],          # touching top:    extent downward
-            max_col[min_col == 0],          # touching left:   extent rightward
-            h - min_row[max_row == h],      # touching bottom: extent upward
-            w - min_col[max_col == w],      # touching right:  extent leftward
+            max_row[min_row == 0],  # touching top:    extent downward
+            max_col[min_col == 0],  # touching left:   extent rightward
+            h - min_row[max_row == h],  # touching bottom: extent upward
+            w - min_col[max_col == w],  # touching right:  extent leftward
         ]
     )
     return distances
 
 
-def _edge_worker(mask_zarr_dir: str, rrs: int, rre: int, ccs: int, cce: int) -> np.ndarray:
+def _edge_worker(
+    mask_zarr_dir: str, rrs: int, rre: int, ccs: int, cce: int
+) -> np.ndarray:
     z = zarr.open_array(pathlib.Path(mask_zarr_dir), mode="r")
     chunk = np.asarray(z[rrs:rre, ccs:cce])
     return _edge_distances(chunk)
@@ -164,7 +186,10 @@ def compute_overlap(
     max_dist = 0
     with logging_redirect_tqdm():
         for distances in tqdm.tqdm(
-            gen, total=len(coords), desc="computing overlap", leave=False,
+            gen,
+            total=len(coords),
+            desc="computing overlap",
+            leave=False,
             disable=not sys.stderr.isatty(),
         ):
             d = int(np.max(distances))
