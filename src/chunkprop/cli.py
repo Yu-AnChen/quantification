@@ -8,6 +8,7 @@ import logging
 import os
 import pathlib
 
+from . import __version__
 from .pipeline import Pipeline
 
 
@@ -16,6 +17,7 @@ def main(argv=None) -> None:
         prog="chunkprop",
         description="Single-cell spatial quantification from multiplexed imaging.",
     )
+    parser.add_argument("--version", action="version", version=f"%(prog)s {__version__}")
 
     # Required args (matches ori interface)
     parser.add_argument(
