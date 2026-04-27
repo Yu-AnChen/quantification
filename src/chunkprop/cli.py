@@ -3,7 +3,10 @@ Command-line interface for chunkprop.
 """
 
 import argparse
+import datetime
 import logging
+import os
+import pathlib
 
 from .pipeline import Pipeline
 
@@ -102,10 +105,19 @@ def main(argv=None) -> None:
 
     args = parser.parse_args(argv)
 
+    os.makedirs(args.output, exist_ok=True)
+    timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+    img_stem = pathlib.Path(args.image).name.partition(".")[0]
+    log_path = os.path.join(args.output, f"{img_stem}_{timestamp}.log")
+
     logging.basicConfig(
         level=logging.INFO,
         format="%(asctime)s %(levelname)-8s %(name)s — %(message)s",
         datefmt="%H:%M:%S",
+        handlers=[
+            logging.StreamHandler(),
+            logging.FileHandler(log_path),
+        ],
     )
 
     pipeline = Pipeline(
