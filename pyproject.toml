@@ -20,8 +20,11 @@ dependencies = [
 [project.scripts]
 chunkprop = "chunkprop.cli:main"
 
-[tool.setuptools]
-packages = ["chunkprop"]
+[tool.setuptools.packages.find]
+where = ["src"]
 
-[tool.setuptools.package-dir]
-"" = "."
+[tool.ruff]
+src = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

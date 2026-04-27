@@ -7,18 +7,14 @@ Creates a small tiled OME-TIFF image + mask, runs the pipeline, and checks:
   - Column order matches ori convention
   - Intensity and morphology values are sensible
 """
-import os
-import sys
-import tempfile
+
 import pathlib
 
 import numpy as np
 import pandas as pd
-import skimage.measure
 import tifffile
 import pytest
 
-sys.path.insert(0, str(pathlib.Path(__file__).parent))
 import chunkprop
 
 
@@ -26,13 +22,14 @@ import chunkprop
 #                              Fixtures / helpers                              #
 # ---------------------------------------------------------------------------- #
 
-def make_synthetic_data(tmp_path, n_cells=20, img_h=512, img_w=512, n_channels=3, tile_size=128):
+
+def make_synthetic_data(
+    tmp_path, n_cells=20, img_h=512, img_w=512, n_channels=3, tile_size=128
+):
     """
     Create a synthetic mask and multichannel image saved as tiled OME-TIFFs.
     Returns (mask_path, img_path, marker_csv_path, expected_centroids).
     """
-    rng = np.random.default_rng(42)
-
     # --- Mask: place non-overlapping square cells ---
     mask = np.zeros((img_h, img_w), dtype=np.int32)
     cell_size = 20
@@ -43,7 +40,9 @@ def make_synthetic_data(tmp_path, n_cells=20, img_h=512, img_w=512, n_channels=3
             if cell_id > n_cells:
                 break
             mask[r : r + cell_size, c : c + cell_size] = cell_id
-            positions.append((r + cell_size / 2, c + cell_size / 2))  # row, col centroid
+            positions.append(
+                (r + cell_size / 2, c + cell_size / 2)
+            )  # row, col centroid
             cell_id += 1
         if cell_id > n_cells:
             break
@@ -76,6 +75,7 @@ def make_synthetic_data(tmp_path, n_cells=20, img_h=512, img_w=512, n_channels=3
 #                                    Tests                                     #
 # ---------------------------------------------------------------------------- #
 
+
 def test_all_cells_found(tmp_path):
     mask_path, img_path, markers, expected, n_cells = make_synthetic_data(tmp_path)
     out = str(tmp_path / "output")
@@ -97,7 +97,10 @@ def test_all_cells_found(tmp_path):
 def test_centroids_are_global(tmp_path):
     """Centroids must be in global image coordinates, not chunk-local."""
     mask_path, img_path, markers, expected, n_cells = make_synthetic_data(
-        tmp_path, img_h=512, img_w=512, tile_size=64  # small tiles → many chunks
+        tmp_path,
+        img_h=512,
+        img_w=512,
+        tile_size=64,  # small tiles → many chunks
     )
     out = str(tmp_path / "output")
     chunkprop.ExtractSingleCells(
@@ -127,10 +130,19 @@ def test_column_order(tmp_path):
 
     assert df.columns[0] == "CellID", "CellID must be the first column"
 
-    tail_cols = ("X_centroid", "Y_centroid", "Area", "MajorAxisLength",
-                 "MinorAxisLength", "Eccentricity", "Solidity", "Extent", "Orientation")
+    tail_cols = (
+        "X_centroid",
+        "Y_centroid",
+        "Area",
+        "MajorAxisLength",
+        "MinorAxisLength",
+        "Eccentricity",
+        "Solidity",
+        "Extent",
+        "Orientation",
+    )
     present_tail = [c for c in tail_cols if c in df.columns]
-    last_cols = list(df.columns[-len(present_tail):])
+    last_cols = list(df.columns[-len(present_tail) :])
     assert last_cols == list(present_tail), (
         f"Tail columns out of order.\nExpected: {present_tail}\nGot: {last_cols}"
     )
@@ -160,6 +172,7 @@ def test_intensity_values(tmp_path):
 
 def test_chunk_size_snap():
     from chunkprop._chunks import compute_chunk_size
+
     assert compute_chunk_size(1024) == 4096
     assert compute_chunk_size(1240) == 3720
     assert compute_chunk_size(256) == 4096
@@ -174,4 +187,5 @@ def test_chunk_size_snap():
 
 if __name__ == "__main__":
     import pytest
+
     pytest.main([__file__, "-v"])
