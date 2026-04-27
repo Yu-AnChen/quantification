@@ -24,6 +24,7 @@ chunkprop = "chunkprop.cli:main"
 where = ["src"]
 
 [tool.setuptools_scm]
+fallback_version = "2026.4.1"
 
 [tool.ruff]
 src = ["src"]
