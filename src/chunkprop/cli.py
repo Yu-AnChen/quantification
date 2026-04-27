@@ -112,7 +112,7 @@ def main(argv=None) -> None:
 
     logging.basicConfig(
         level=logging.INFO,
-        format="%(asctime)s %(levelname)-8s %(name)s — %(message)s",
+        format="%(asctime)s %(levelname)-8s %(name)s: %(message)s",
         datefmt="%H:%M:%S",
         handlers=[
             logging.StreamHandler(),

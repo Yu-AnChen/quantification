@@ -5,8 +5,6 @@ environments:
     - url: https://conda.anaconda.org/conda-forge/
     indexes:
     - https://pypi.org/simple
-    options:
-      pypi-prerelease-mode: if-necessary-or-explicit
     packages:
       linux-64:
       - conda: https://conda.anaconda.org/conda-forge/linux-64/_openmp_mutex-4.5-20_gnu.conda
@@ -139,8 +137,6 @@ environments:
     - url: https://conda.anaconda.org/conda-forge/
     indexes:
     - https://pypi.org/simple
-    options:
-      pypi-prerelease-mode: if-necessary-or-explicit
     packages:
       linux-64:
       - conda: https://conda.anaconda.org/conda-forge/linux-64/_openmp_mutex-4.5-20_gnu.conda
@@ -444,7 +440,7 @@ packages:
   timestamp: 1776865545798
 - pypi: ./
   name: chunkprop
-  version: 2026.4.2.dev27+g8cc2fa4e3.d20260427
+  version: 2026.4.1
   sha256: 55cf879253e03eadcf93b6de4e152c107b258d611ed44045d989909497a5ca2f
   requires_dist:
   - h5py>=3.11
@@ -456,6 +452,7 @@ packages:
   - tqdm>=4.66
   - imagecodecs>=2024.9
   requires_python: '>=3.10'
+  editable: true
 - pypi: https://files.pythonhosted.org/packages/d1/d6/3965ed04c63042e047cb6a3e6ed1a63a35087b6a609aa3a15ed8ac56c221/colorama-0.4.6-py2.py3-none-any.whl
   name: colorama
   version: 0.4.6

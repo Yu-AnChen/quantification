@@ -1,6 +1,7 @@
 # chunkprop
 
 Single-cell spatial quantification from multiplexed imaging.  
+
 Extracts per-cell morphological and intensity measurements from segmentation
 masks and multi-channel images. Output is compatible with histoCAT.
 
@@ -29,6 +30,12 @@ Or with [pixi](https://pixi.sh):
 
 ```bash
 pixi install
+```
+
+For development (adds ruff, pytest, ipykernel):
+
+```bash
+pixi install -e dev
 ```
 
 ## CLI usage
@@ -78,12 +85,19 @@ CD8
 ```
 
 Legacy single-column format (no header) is also accepted.  
-Duplicate names are automatically suffixed: `CD8`, `CD8_1`, `CD8_2`, …
+Duplicate names are automatically suffixed: `CD8_1`, `CD8_2`, `CD8_3`, …
 
 ## Output
 
-One file per mask, named `{image}_{mask}.csv` (or `.parquet`), written to the
-output directory.
+One table per mask, named `{image_stem}_{mask_stem}.csv` (or `.parquet`),
+written to the output directory. For example:
+
+```
+feature_extraction/
+  image_cellRing.csv
+  image_nucleiMask.csv
+  image_20260428_143022.log
+```
 
 Column layout matches histoCAT convention:
 
@@ -95,6 +109,12 @@ CellID | <channel columns> | X_centroid | Y_centroid | Area | MajorAxisLength | 
 - **Channel columns** — `intensity_mean` stored under the bare channel name
   (`CD8`, `DAPI`); extra properties suffixed (`CD8_gini_index`)
 - **Morphology tail** — spatial and shape properties last
+
+### Log file
+
+Each run writes a log file to the output directory named
+`{image_stem}_{timestamp}.log` (e.g. `image_20260428_143022.log`).
+The same messages are also printed to the terminal.
 
 ## Extra intensity properties
 
@@ -128,7 +148,7 @@ Pipeline(
 ).run()
 ```
 
-Backward-compatible wrappers matching the original chunkprop API are also
+Backward-compatible wrappers matching the original mcquant API are also
 available:
 
 ```python
@@ -157,3 +177,28 @@ import tifffile, numpy as np
 img = tifffile.imread("image.tif")
 tifffile.imwrite("image.ome.tif", img, tile=(1024, 1024), compression="zlib")
 ```
+
+## Docker
+
+Build the image from the project root:
+
+```bash
+docker build -t chunkprop .
+```
+
+Run with data mounted into the container:
+
+```bash
+docker run --rm \
+  -v /path/to/data:/data \
+  chunkprop \
+    chunkprop \
+      --mask /data/segmentation/cellRing.ome.tif \
+      --image /data/registration/image.ome.tif \
+      --channel-names /data/markers.csv \
+      --output /data/feature_extraction/
+```
+
+The image uses a two-stage build: dependencies are resolved by
+[pixi](https://pixi.sh) in the build stage; only the resolved environment is
+copied to the final `ubuntu:24.04` image, keeping it lean.
