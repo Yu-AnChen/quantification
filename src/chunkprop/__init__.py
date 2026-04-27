@@ -8,6 +8,12 @@ ExtractSingleCells / MultiExtractSingleCells : backward-compatible wrappers
 """
 
 import logging
+from importlib.metadata import PackageNotFoundError, version
+
+try:
+    __version__ = version("chunkprop")
+except PackageNotFoundError:
+    __version__ = "unknown"
 
 from .pipeline import Pipeline
 
@@ -67,6 +73,7 @@ def MultiExtractSingleCells(
 
 
 __all__ = [
+    "__version__",
     "Pipeline",
     "ExtractSingleCells",
     "MultiExtractSingleCells",
