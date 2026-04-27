@@ -6,6 +6,7 @@ morphology pass, per-channel intensity passes, and CSV/parquet output.
 import logging
 import os
 import tempfile
+from concurrent.futures import ProcessPoolExecutor
 
 import numpy as np
 
@@ -123,41 +124,47 @@ class Pipeline:
             )
             log.info("Overlap: %d px", overlap)
 
-            # Morphology pass
-            morph_df = morphology_pass(
-                mask_zarr_dir,
-                self._mask_shape,
-                self._chunk_size,
-                overlap,
-                self.mask_props,
-                self.n_jobs,
-            )
-            valid_labels = morph_df["CellID"].to_numpy(dtype=np.int64)
-            max_label = int(valid_labels.max())
-            log.info("Cells found: %d  (max label: %d)", len(valid_labels), max_label)
-
-            # Intensity passes — one per channel
-            n_channels = len(self._channel_names)
-            channel_arrays: dict[str, np.ndarray] = {}
-            for ch_idx, ch_name in enumerate(self._channel_names):
-                log.info("Channel %d/%d: %s", ch_idx + 1, n_channels, ch_name)
-                ch_arrays = intensity_pass(
-                    mask_zarr_dir=mask_zarr_dir,
-                    img_path=self.img_path,
-                    img_format=self._img_mode,
-                    hdf5_key=self._img_meta["hdf5_key"],
-                    shape=self._mask_shape,
-                    channel_idx=ch_idx,
-                    channel_name=ch_name,
-                    chunk_size=self._chunk_size,
-                    overlap=overlap,
-                    valid_labels=valid_labels,
-                    max_label=max_label,
-                    intensity_props=self.intensity_props,
-                    n_jobs=self.n_jobs,
-                    channel_axis=self._img_meta["channel_axis"],
+            # Single process pool shared across morphology + all intensity passes
+            # to avoid per-channel process spawn overhead.
+            with ProcessPoolExecutor(max_workers=self.n_jobs) as executor:
+                # Morphology pass
+                morph_df = morphology_pass(
+                    mask_zarr_dir,
+                    self._mask_shape,
+                    self._chunk_size,
+                    overlap,
+                    self.mask_props,
+                    executor,
                 )
-                channel_arrays.update(ch_arrays)
+                valid_labels = morph_df["CellID"].to_numpy(dtype=np.int64)
+                max_label = int(valid_labels.max())
+                log.info(
+                    "Cells found: %d  (max label: %d)", len(valid_labels), max_label
+                )
+
+                # Intensity passes — one per channel
+                n_channels = len(self._channel_names)
+                channel_arrays: dict[str, np.ndarray] = {}
+                for ch_idx, ch_name in enumerate(self._channel_names):
+                    log.info("Channel %d/%d: %s", ch_idx + 1, n_channels, ch_name)
+                    ch_arrays = intensity_pass(
+                        mask_zarr_dir=mask_zarr_dir,
+                        img_path=self.img_path,
+                        img_format=self._img_mode,
+                        hdf5_key=self._img_meta["hdf5_key"],
+                        shape=self._mask_shape,
+                        channel_idx=ch_idx,
+                        channel_name=ch_name,
+                        chunk_size=self._chunk_size,
+                        overlap=overlap,
+                        valid_labels=valid_labels,
+                        max_label=max_label,
+                        intensity_props=self.intensity_props,
+                        executor=executor,
+                        n_jobs=self.n_jobs,
+                        channel_axis=self._img_meta["channel_axis"],
+                    )
+                    channel_arrays.update(ch_arrays)
 
         # Build final DataFrame (one allocation, outside tempdir)
         result = build_output(morph_df, channel_arrays)

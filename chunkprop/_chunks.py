@@ -4,10 +4,10 @@ Chunk coordinate computation, overlap estimation, and mask zarr conversion.
 
 import pathlib
 import sys
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Iterator
 import warnings
 
-import joblib
 import numpy as np
 import skimage.measure
 import skimage.segmentation
@@ -182,23 +182,23 @@ def compute_overlap(
         for ci in range(nc)
     ]
 
-    gen = joblib.Parallel(backend="threading", n_jobs=n_jobs, return_as="generator")(
-        joblib.delayed(_edge_worker)(mask_zarr_dir, rrs, rre, ccs, cce)
-        for rrs, rre, ccs, cce in coords
-    )
-
     max_dist = 0
-    with logging_redirect_tqdm():
-        for distances in tqdm.tqdm(
-            gen,
-            total=len(coords),
-            desc="computing overlap",
-            leave=False,
-            disable=not sys.stderr.isatty(),
-        ):
-            d = int(np.max(distances))
-            if d > max_dist:
-                max_dist = d
+    with ThreadPoolExecutor(max_workers=n_jobs) as executor:
+        futures = [
+            executor.submit(_edge_worker, mask_zarr_dir, rrs, rre, ccs, cce)
+            for rrs, rre, ccs, cce in coords
+        ]
+        with logging_redirect_tqdm():
+            for future in tqdm.tqdm(
+                as_completed(futures),
+                total=len(futures),
+                desc="computing overlap",
+                leave=False,
+                disable=not sys.stderr.isatty(),
+            ):
+                d = int(np.max(future.result()))
+                if d > max_dist:
+                    max_dist = d
 
     overlap = int(_OVERLAP_ALIGN * np.ceil(max_dist / _OVERLAP_ALIGN))
     cap = chunk_size - _OVERLAP_ALIGN
