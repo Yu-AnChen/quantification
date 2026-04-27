@@ -14,7 +14,8 @@ Neither pass materialises more than ``n_jobs`` chunks at once.
 """
 
 import sys
-from concurrent.futures import Executor, as_completed
+from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor, as_completed
+from contextlib import nullcontext
 
 import h5py
 import numpy as np
@@ -118,7 +119,7 @@ def morphology_pass(
     chunk_size: int,
     overlap: int,
     extra_mask_props: list[str] | None,
-    executor: Executor,
+    executor: ProcessPoolExecutor,
 ) -> pd.DataFrame:
     """
     Compute morphological properties for all cells in the mask.
@@ -200,7 +201,8 @@ def intensity_pass(
     valid_labels: np.ndarray,
     max_label: int,
     intensity_props: list[str] | None,
-    executor: Executor,
+    executor: ProcessPoolExecutor,
+    n_jobs: int,
     channel_axis: int | None = None,
 ) -> dict[str, np.ndarray]:
     """
@@ -228,6 +230,9 @@ def intensity_pass(
     coords = list(iter_chunk_coords(shape, chunk_size, overlap))
 
     if img_format == "tiff_tiled":
+        # Tiled: use the shared process pool passed from the pipeline.
+        # nullcontext leaves the caller-owned executor open after this function returns.
+        exec_ctx = nullcontext()
         futures = [
             executor.submit(
                 _intensity_worker_tiled,
@@ -249,8 +254,9 @@ def intensity_pass(
         full_channel = _load_full_channel(
             img_path, img_format, hdf5_key, channel_idx, channel_axis
         )
+        exec_ctx = ThreadPoolExecutor(max_workers=n_jobs)
         futures = [
-            executor.submit(
+            exec_ctx.submit(
                 _intensity_worker_nontiled,
                 mask_zarr_dir,
                 full_channel,
@@ -264,38 +270,41 @@ def intensity_pass(
             for rrs, rre, ccs, cce in coords
         ]
 
-    with logging_redirect_tqdm():
-        for future in tqdm.tqdm(
-            as_completed(futures),
-            total=len(futures),
-            desc=f"  {channel_name}",
-            leave=False,
-            disable=not sys.stderr.isatty(),
-        ):
-            chunk_result = future.result()
-            labels = chunk_result["label"]
-            areas = chunk_result["area"]
-            if len(labels) == 0:
-                continue
+    with exec_ctx:
+        with logging_redirect_tqdm():
+            for future in tqdm.tqdm(
+                as_completed(futures),
+                total=len(futures),
+                desc=f"  {channel_name}",
+                leave=False,
+                disable=not sys.stderr.isatty(),
+            ):
+                chunk_result = future.result()
+                labels = chunk_result["label"]
+                areas = chunk_result["area"]
+                if len(labels) == 0:
+                    continue
 
-            # Clip to pre-allocated range (labels outside max_label are background/artifacts)
-            in_range = labels <= max_label
-            labels = labels[in_range]
-            areas = areas[in_range]
+                # Clip to pre-allocated range (labels outside max_label are background/artifacts)
+                in_range = labels <= max_label
+                labels = labels[in_range]
+                areas = areas[in_range]
 
-            better = areas > best_area[labels]
-            win_labels = labels[better]
-            if len(win_labels) == 0:
-                continue
+                better = areas > best_area[labels]
+                win_labels = labels[better]
+                if len(win_labels) == 0:
+                    continue
 
-            best_area[win_labels] = areas[better]
-            for key in prop_keys:
-                # Extra props may generate columns like 'gini_index' directly
-                src_key = (
-                    key if key in chunk_result else _find_extra_key(chunk_result, key)
-                )
-                if src_key is not None:
-                    accs[key][win_labels] = chunk_result[src_key][in_range][better]
+                best_area[win_labels] = areas[better]
+                for key in prop_keys:
+                    # Extra props may generate columns like 'gini_index' directly
+                    src_key = (
+                        key
+                        if key in chunk_result
+                        else _find_extra_key(chunk_result, key)
+                    )
+                    if src_key is not None:
+                        accs[key][win_labels] = chunk_result[src_key][in_range][better]
 
     # Slice to valid labels only
     result: dict[str, np.ndarray] = {}

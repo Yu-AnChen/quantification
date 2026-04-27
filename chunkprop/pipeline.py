@@ -6,7 +6,7 @@ morphology pass, per-channel intensity passes, and CSV/parquet output.
 import logging
 import os
 import tempfile
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import ProcessPoolExecutor
 
 import numpy as np
 
@@ -124,8 +124,9 @@ class Pipeline:
             )
             log.info("Overlap: %d px", overlap)
 
-            # Single thread pool shared across morphology + all intensity passes.
-            with ThreadPoolExecutor(max_workers=self.n_jobs) as executor:
+            # Single process pool shared across morphology + all intensity passes
+            # to avoid per-channel process spawn overhead.
+            with ProcessPoolExecutor(max_workers=self.n_jobs) as executor:
                 # Morphology pass
                 morph_df = morphology_pass(
                     mask_zarr_dir,
@@ -160,6 +161,7 @@ class Pipeline:
                         max_label=max_label,
                         intensity_props=self.intensity_props,
                         executor=executor,
+                        n_jobs=self.n_jobs,
                         channel_axis=self._img_meta["channel_axis"],
                     )
                     channel_arrays.update(ch_arrays)
