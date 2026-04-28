@@ -11,6 +11,16 @@ Intensity pass  : pre-allocated numpy arrays of length (max_label + 1) —
                   DataFrame at the end of each channel.
 
 Neither pass materialises more than ``n_jobs`` chunks at once.
+
+Parallelism notes
+-----------------
+Process-based parallelism (ProcessPoolExecutor / loky) is used for tiled images
+so that skimage regionprops — which holds the GIL — actually runs in parallel.
+
+``cache=False`` in regionprops_table was benchmarked and rejected: it produced
+slightly lower RAM accumulation between chunks but increased wall-clock time and
+did not move the needle on peak RSS because the worker process memory footprint
+(chunk data + skimage internals) is the actual bottleneck, not the property cache.
 """
 
 import sys
